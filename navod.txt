@@ -1,3 +1,210 @@
+== Úvod ==
+Vlastní mikrostránky slouží jako samostatné vstupní brány pro klienty do aplikace Mluvii, svou funkčností jde v podstatě o přerostlé widgety.
+
+Postup tvorby je následující:
+# Nastavit konfigurační balíček
+# Vytvořit html dokument
+# Přidat CSS styly
+# Přidat Javascript
+# Uložit stránku na hosting
+
+Pro svou jednoduchost, tak jako v jiných návodech, budeme používat codepen.io. Začít můžete [https://codepen.io/pen?template=KXZyGp zde].
+
+== Nastavení konfiguračního balíčku ==
+V administraci aplikace v sekci Konfigurační balíčky si vytvoříme nový / upravíme stávající konfigurační balíček. Tlačítko balíčku nastavíme na "žádné tlačítko" - tím se nám tlačítko nebude zobrazovat, nicméně všechny funkcionality s tlačítkem spojené nám budou k dispozici. Nastavení chatovacího okna je libovolné.
+
+== Postup tvorby ==
+V tomto návodu společně vytvoříme tři lehce odlišné verze mikrostránky, které budou umět připojit uživatele do aplikace Mluvii přes chatovací okno, videohovor, respektive callback/callshow, budou umět zobrazit stav widgetu a pracovat s parametry hovorů (přednastavenými i vlastními proměnnými). Konečná podoba bude následující:
+
+{{#iDisplay://codepen.io/patricke004/embed/eejrvB/?height=265&theme-id=0&default-tab=result&embed-version=2}}
+
+=== Vytvoření html souboru ===
+HTML dokument je následující. Použité obrázky jsou uloženy na github stránkách, kde celou mikrostránku nakonec uložíme.
+
+{{#iDisplay://codepen.io/patricke004/embed/eejrvB/?height=265&theme-id=0&default-tab=html&embed-version=2}}
+
+=== Přidání CSS stylů ===
+
+{{#iDisplay://codepen.io/patricke004/embed/eejrvB/?height=265&theme-id=0&default-tab=css&embed-version=2}}
+
+=== Přidání Javascriptu ===
+
+Javascriptem přivedeme naší mikrostránku k životu. Nejdříve vložíme kód našeho konfiguračního balíčku.
+
+<syntaxhighlight lang="javascript">
+(function () {
+  var scr = document.createElement('script'); scr.type = 'text/javascript'; scr.async = true; scr.charset = 'UTF-8';
+  scr.src = '//app.mluvii.com/widget/OOWidget.js';
+  scr.$owidgetOnLoad = function (owidget) {
+    if (!owidget.isSupported) { return; }
+    owidget.init('295b1064-cf5b-4a5d-9e05-e7a74f86ae5e', 'navodMicroSite');
+    owidget.connectToServer();
+  };
+  var ffs = document.getElementsByTagName('script')[0]; ffs.parentNode.insertBefore(scr, ffs);
+})();
+</syntaxhighlight>
+
+Do funkce $owidgetOnLoad vložíme téměř celý náš javascriptový kód:
+<syntaxhighlight lang="javascript">
+scr.$owidgetOnLoad = function (owidget) {
+  // Náš kód
+};
+</syntaxhighlight>
+
+==== Indikace stavu balíčku ====
+Jako první začneme s indikací stavu balíčku, tedy to, zdali jsou operátoři přiřazení k danému balíčku online, zanepřázdnění nebo offline. A to touto funkcí:
+<syntaxhighlight lang="javascript">
+owidget.setStatusUpdateCallback()
+</syntaxhighlight>
+
+Tato funkce bere jako parametr callback funkci, která bude volána pokaždé, kdy ze serveru přijdou informace o stavu operátorů. Tento callback bere parametr "code", tedy číslo 0 v případě, že operátoři jsou offline, 1 v případě, že jsou online a 2 v případě zaneprázdnění.
+
+Kód funkce $owidgetOnLoad bude zatím vypadat takto:
+<syntaxhighlight lang="javascript">
+if (!owidget.isSupported) { return; }
+owidget.init('295b1064-cf5b-4a5d-9e05-e7a74f86ae5e', 'navodMicroSite');
+
+let widgetOnline = true;
+
+owidget.setStatusUpdateCallback(function(code) {
+    const statusIndicatorImage = document.getElementById('StatusIndicatorCore-imageSelf');
+    const statusIndicatorText = document.getElementById('StatusIndicatorCore-textSelf');
+
+    switch(code) {
+        case 0:
+            statusIndicatorImage.src = 'Images/ikonka_konverzace-01_offline.png';
+            statusIndicatorText.innerText = 'Jsme offline';
+            statusIndicatorText.style.color = '#bf464f';
+            widgetOnline = false; 
+            break;
+         case 1:
+            statusIndicatorImage.src = 'Images/ikonka_konverzace-01_online.png';
+            statusIndicatorText.innerText = 'Jsme online';
+            statusIndicatorText.style.color = '#8dc63f';
+            widgetOnline = true;
+            break;
+         case 2:
+            statusIndicatorImage.src = 'Images/ikonka_konverzace-01_busy.png';
+            statusIndicatorText.innerText = 'Máme toho hodně';
+            statusIndicatorText.style.color = '#ffbb06';                                           
+            widgetOnline = true;                        
+            break;
+         }
+    });
+</syntaxhighlight>
+
+==== Input a Tlačítko aplikace ====
+Dalším krokem je zprovoznění tlačítka pro vstup do aplikace Mluvii. Nejprve se podívejme na variantu pro callback/callshow.
+
+Na stránce máme input pro zadání čísla pozvánky nebo telefonního čísla a tlačítko pro vstup do aplikace. Na tomto tlačítku budeme naslouchat klepnutí, jakmile se tak stane, otevřeme velkou místnost aplikace Mluvii, pokud nejsou všichni operátoři offline:
+<syntaxhighlight lang="javascript">
+const widgetButton = document.getElementById('WidgetInput-button');
+const widgetInput = document.getElementById('WidgetInput-input');
+
+widgetButton.addEventListener('click', function() {
+   if(!widgetOnline) return; // tuto proměnnou deklarujeme a nastavujeme výše.
+   owidget.openApp('callshow', widgetInput.value);
+}
+
+</syntaxhighlight>
+
+Nyní přidáme validaci inputu regulárním výrazem, aby bylo možné na server posílat pouze šesti a devítimístná čísla a uživateli zobrazíme i zprávu o tomto stavu:
+<syntaxhighlight lang="javascript">
+const hints = document.getElementById('Hints');
+const regNumberLength6 = new RegExp('^\\d{6}$');
+const regNumberLength9 = new RegExp('^\\d{9}$');
+
+widgetButton.addEventListener('click', function() {
+   if(!widgetOnline) return; // tuto proměnnou deklarujeme a nastavujeme výše.
+   
+   // V případě, že input neprošel jedním z našich testů, zobrazíme nápovědu
+   if(!regNumberLength6.test(widgetInput.value) || !regNumberLength9.test(widgetInput.value)) {
+     hints.classList.remove('isHidden');
+   }
+
+   // Pokud je číslo šestimístné, zahájíme callshow v novém okně
+   if(regNumberLength6.test(widgetInput.value)) {
+     owidget.openApp('callshow', widgetInput.value)
+   }
+
+   // Pokud je číslo devítimístné, zahájíme callback v novém okně
+   if(regNumberLength9.test(widgetInput.value)) {
+     owidget.openApp('callback', widgetInput.value);
+   }
+}
+</syntaxhighlight>
+
+Případ pro callback můžeme ještě poupravit a použít funkce:
+<syntaxhighlight lang="javascript">
+owidget.numberNormalization(string)
+// nebo
+owidget.setCustomNumberNormalization(vaseNormalizacniFunkce);
+</syntaxhighlight>
+
+První z funkcí je přednastavená normalizační funkce, která telefonnímu číslu přidá mezinárodní předčíslí a případně odstraní mezery apod., což ale v našem případě není třeba.
+
+Druhá funkce umožňuje přidat vlastní normalizační funkci, např. s vlastním mezinárodním číslem apod.
+
+Otevření callbacku pak bude vypadat takto:
+<syntaxhighlight lang="javascript">
+if(regNumberLength9.test(widgetInput.value)) {
+    owidget.numberNormalization(widgetInput.value)
+    const normalizedNumber = owidget.numberNormalization(widgetInput.value);
+    owidget.openApp('callback', normalizedNumber);
+}
+</syntaxhighlight>
+
+Abychom si byli jistí, že nám nápověda zmizí, jakmile uživatel zadá šesti nebo devítimístné číslo do inputu, vytvoříme event listener pro tento případ:
+<syntaxhighlight lang="javascript">
+widgetInput.addEventListener('input', function() {
+  if(regNumberLength6.test(widgetInput.value) || regNumberLength9.test(widgetInput.value)) {
+     hints.classList.add('isHidden');
+  }
+});
+</syntaxhighlight>
+
+Tím máme základní funkčnost naší mikrostránky zařízenou.
+
+
+==== Vlastní proměnné ====
+Spolu s tel. číslem nebo číslem pozvánky můžeme operátorům odeslat vlastní proměnné. Na mikrostránce jsme k tomuto účelu vytvořili input, který, bude-li vyplněn pošle na server proměnnou (parametr hovoru). Kód vložíme před testy regulárními výrazy:
+<syntaxhighlight lang="javascript">
+if(nameInput.value !== '') {
+    owidget.addCustomData('navod_clientName', nameInput.value);
+}
+</syntaxhighlight>
+
+Na mikrostránce můžeme počítat i s dalšími libovolnými interakcemi, např. v podobě přihlášení / odhlášení uživatele. Za listenerem pro tlačítko Začít hovor bychom vytvořili další listnery pro Login a Logout tlačítka, u kterých je předpoklad, že web má vlastní logiku autentizace uživatelů. V momentě zdařilé autentizace / odhlášení využijeme funkcí Mluvii:
+<syntaxhighlight lang="javascript">
+const login = document.getElementById('login');
+const logout = document.getElementById('logout');
+
+login.addEventListener('click', function() {
+    const foundUserId = 'as3d21sad351as-as1d';
+    owidget.addCustomData('navod_clientId', foundUserId);
+});
+logout.addEventListener('click', function() {
+    owidget.removeCustomData('navod_clientId');
+    // owidget.clearCustomData();
+});
+</syntaxhighlight>
+Funkce owidget.removeCustomData si bere jako parametr název proměnné, kterou chceme smazat. Funkce owidget.clearCustomData() smaže všechny proměnné.
+
+Javascript naší mikrostránky nakonec vypadá následovně:
+
+{{#iDisplay://codepen.io/patricke004/embed/eejrvB/?height=265&theme-id=0&default-tab=js&embed-version=2}}
+
+=== Publikace mikrostránky ===
+
+Pokud jste při tvorbě vlastního CTA využili codepen.io, je nyní potřeba CTA exportovat. Klikněte na tlačítko '''Save''', poté exportujte v '''.zip''' formátu:
+
+[[Soubor:obrazekkk.png]]
+ 
+Vytvořené CTA můžete uložit buď jako podstránku vašeho webu, nebo využít jakýkoliv webhosting, např. Github stránky.
+
+Pokud jste využili textového editoru, výsledná stránka bude vypadat následovně:
+
+<syntaxhighlight lang="javascript">
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -306,3 +513,4 @@
     </script>
 </body>
 </html>
+</syntaxhighlight>
